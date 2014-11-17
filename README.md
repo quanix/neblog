@@ -1,4 +1,4 @@
-neblog
+demoblog
 ======
 
-node.js express + mongodb 搭建的blog
+使用 Node.js express + MongoDB 搭建的Demo博客
