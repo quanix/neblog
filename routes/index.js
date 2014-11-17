@@ -11,18 +11,25 @@ module.exports = function(app) {
   /** 默认访问路径  **/
   app.get('/',function(req,res) {
 
-    Post.get(null,function(err,posts) {
+
+    var page = req.query.p ? parseInt(req.query.p) : 1;
+
+    Post.getTen(null,page,function(err,posts,total) {
       if(err) {
         posts = [];
       }
       res.render('index', {
         title: '主页',
+        posts: posts,
+        page: page,
+        isFirstPage: (page - 1) == 0,
+        isLastPage: ((page - 1) * 10 + posts.length) == total,
         user: req.session.user,
-        posts:posts,
         success: req.flash('success').toString(),
         error: req.flash('error').toString()
       });
     });
+
   });
 
   /** 注册页面 GET **/
@@ -198,26 +205,33 @@ module.exports = function(app) {
 
 
   app.get('/u/:name',function(req, res) {
+
+    var page = req.query.p ? parseInt(req.query.p) : 1;
+
     User.get(req.params.name, function(err,user) {
       if(!user) {
         req.flash('error','用户不存在!');
         return res.redirect('/');
       }
 
-      //查询并返回该用户的所有文章
-      Post.get(user.name,function(err,posts) {
+      Post.getTen(user.name,page,function(err,posts) {
         if(err) {
           req.flash('error',err);
           return res.redirect('/');
         }
 
-        res.redirect('user',{
+        //查询并返回该用户的所有文章
+        res.render('user', {
           title: user.name,
           posts: posts,
-          user : req.session.user,
-          success : req.flash('success').toString(),
-          error : req.flash('error').toString()
+          page: page,
+          isFirstPage: (page - 1) == 0,
+          isLastPage: ((page - 1) * 10 + posts.length) == total,
+          user: req.session.user,
+          success: req.flash('success').toString(),
+          error: req.flash('error').toString()
         });
+
       });
     });
   });
@@ -237,6 +251,38 @@ module.exports = function(app) {
       });
     });
   });
+
+
+  /** 提交评论 **/
+  app.post('/u/:name/:day/:title',function(req,res) {
+    var date = new Date(),
+        time = date.getFullYear() + "-" + (date.getMonth() + 1) + "-" + date.getDate() + " " +
+            date.getHours() + ":" + (date.getMinutes() < 10 ? '0' + date.getMinutes() : date.getMinutes());
+
+    var comment = {
+      name : req.body.name,
+      email: req.body.emali,
+      website: req.body.website,
+      time:time,
+      content: req.body.content
+    }
+
+    var newComment = new Comment(req.params.name, req.params.day, req.params.title, comment);
+
+    //保存评论
+    newComment.save(function(err) {
+      if(err) {
+        req.flash('error',err);
+        return res.redirect('back');
+      }
+
+      req.flash('success','留言成功!');
+      res.redirect('back');
+    });
+
+  });
+
+
 
 
   /**
@@ -272,7 +318,7 @@ module.exports = function(app) {
         return res.redirect(url);//出错！返回文章页
       }
       req.flash('success', '修改成功!');
-      res.redirect(url);//成功！返回文章页
+      res.redirect('/');//成功！返回文章页
     });
   });
 

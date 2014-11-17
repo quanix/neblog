@@ -27,7 +27,8 @@ Post.prototype.save = function(callback) {
         name : this.name,
         time : time,
         title: this.title,
-        post : this.post
+        post : this.post,
+        comments : []
     }
 
     //打开数据库
@@ -103,6 +104,48 @@ Post.get = function(name,callback) {
 //获取10篇文章
 Post.getTen = function(name,page,callback) {
 
+    //打开数据库
+    mongodb.open(function(err,db) {
+        if(err) {
+            return callback(err);
+        }
+
+        //读取数据库集合
+        db.collection('posts',function(err,collection) {
+            if(err) {
+                mongodb.close();
+                return callback(err);
+            }
+
+            //查询条件
+            var query = {};
+            if(name) {
+                query.name = name;
+            }
+
+            //使用 count 返回特定查询的文档数
+            collection.count(query,function(err,total) {
+                //根据query对象查询,并跳过前 (page - 1)*10个结果
+                collection.find(query,{
+                    skip : (page-1)*10,
+                    limit:10
+                }).sort({
+                    time:-1
+                }).toArray(function(err,docs) {
+                    mongodb.close();
+                    if(err) {
+                        return callback(err);
+                    }
+                    
+                    //解析 markdown 为 html
+                    docs.forEach(function (doc) {
+                        doc.post = markdown.toHTML(doc.post);
+                    });
+                    callback(null,docs,total);
+                });
+            });
+        });
+    });
 };
 
 
@@ -131,7 +174,13 @@ Post.getOne = function(name,day,title,callback) {
                     return callback(err);
                 }
 
-                doc.post = markdown.toHTML(doc.post);
+                if(doc) {
+                    doc.post = markdown.toHTML(doc.post);
+                    doc.comments.forEach(function(comment) {
+                        comment.content = markdown.toHTML(comment.content);
+                    });
+                }
+
                 callback(null,doc);//返回查询的一篇文章
             });
         });
